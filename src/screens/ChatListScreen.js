@@ -1,18 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  TextInput,
-  Modal,
-  ChatScreenStyleheet,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, TextInput, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { setChats } from '../redux/chatSlice';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { listenForChats, addNewChat } from '../redux/chatSlice';
 import ChatScreenStyle from './ChatScreenStyle';
 
 function ChatListScreen({ navigation }) {
@@ -21,30 +10,19 @@ function ChatListScreen({ navigation }) {
   const [modalVisible, setModalVisible] = useState(false);
   const [newChatName, setNewChatName] = useState('');
 
-  const handleNewChat = async () => {
-    if (!newChatName.trim()) {
-      return;
-    }
-    const newChat = { id: Date.now().toString(), name: newChatName.trim() };
-    const updatedChats = [...chats, newChat];
-    dispatch(setChats(updatedChats));
-    await AsyncStorage.setItem('chats', JSON.stringify(updatedChats));
+  useEffect(() => {
+    dispatch(listenForChats());
+  }, []);
+
+  const handleNewChat = () => {
+    if (!newChatName.trim()) return;
+    dispatch(addNewChat(newChatName.trim()));
     setNewChatName('');
     setModalVisible(false);
   };
 
-  useEffect(() => {
-    const loadChats = async () => {
-      const data = await AsyncStorage.getItem('chats');
-      if (data) {
-        dispatch(setChats(JSON.parse(data)));
-      }
-    };
-    loadChats();
-  }, []);
-
   return (
-    <KeyboardAvoidingView style={ChatScreenStyle.container}>
+    <KeyboardAvoidingView style={ChatScreenStyle.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <FlatList
         data={chats}
         keyExtractor={(item) => item.id}

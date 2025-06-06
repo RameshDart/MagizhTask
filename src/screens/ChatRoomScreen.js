@@ -1,8 +1,7 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from 'react';
 import { Button, FlatList, Text, TextInput, View } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { loadMessages, sendMessage } from '../redux/chatSlice';
+import { listenForMessages, sendMessage } from '../redux/chatSlice';
 
 function ChatRoomScreen({ route }) {
   const { chatId, name } = route.params;
@@ -11,34 +10,44 @@ function ChatRoomScreen({ route }) {
   const messages = useSelector((state) => state.chat.messages[chatId] || []);
   const user = useSelector((state) => state.chat.user);
 
+  useEffect(() => {
+    dispatch(listenForMessages(chatId));
+  }, [chatId]);
+
   const handleClick = () => {
+    if (!text.trim()) return;
+
     const newMsg = {
-      text,
-      sender: user.name,
-      timestamp: new Date().toLocaleTimeString(),
+      text: text.trim(),
+      sender: user?.name || 'Anonymous',
+      timestamp: Date.now(),
     };
     dispatch(sendMessage({ chatId, message: newMsg }));
     setText('');
   };
 
   const renderList = ({ item }) => (
-    <Text style={{ padding: 5, backgroundColor: item.sender === user.name ? '#dcf8c6' : '#eee' }}>
-      {item.sender}: {item.text} ({item.timestamp})
+    <Text
+      style={{
+        padding: 8,
+        marginVertical: 2,
+        borderRadius: 6,
+        backgroundColor: item.sender === user?.name ? '#dcf8c6' : '#eee',
+      }}
+    >
+      {item.sender}: {item.text} ({new Date(item.timestamp).toLocaleTimeString()})
     </Text>
   );
-  const load = async () => {
-    const data = await AsyncStorage.getItem('messages');
-    if (data) dispatch(loadMessages(JSON.parse(data)));
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
 
   return (
     <View style={{ flex: 1, padding: 10 }}>
       <FlatList data={messages} keyExtractor={(_, i) => i.toString()} renderItem={renderList} />
-      <TextInput value={text} onChangeText={setText} style={{ borderWidth: 1, marginBottom: 5 }} />
+      <TextInput
+        value={text}
+        onChangeText={setText}
+        style={{ borderWidth: 1, marginBottom: 5, padding: 10, borderRadius: 5 }}
+        placeholder='Type your message'
+      />
       <Button title='Send' onPress={handleClick} />
     </View>
   );

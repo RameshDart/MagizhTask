@@ -14,7 +14,7 @@ const AppNavigator = () => (
     <Stack.Screen name='Chats' component={ChatListScreen} />
     <Stack.Screen
       name='ChatRoom'
-      options={({ route }) => ({ title: route.params?.name || 'Chat Room' })}
+      options={({ route }) => ({ title: route?.params?.name || 'Chat Room' })}
       component={ChatRoomScreen}
     />
   </Stack.Navigator>
