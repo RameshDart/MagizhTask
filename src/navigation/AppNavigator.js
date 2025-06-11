@@ -11,10 +11,14 @@ const AppNavigator = () => (
   <Stack.Navigator initialRouteName='Login'>
     <Stack.Screen name='Login' component={LoginScreen} />
     <Stack.Screen name='Register' component={RegisterScreen} />
-    <Stack.Screen name='Chats' component={ChatListScreen} />
+    <Stack.Screen
+      name='Chats'
+      options={({ route }) => ({ title: `Welcome ${route?.params?.username}!` || 'Chat List' })}
+      component={ChatListScreen}
+    />
     <Stack.Screen
       name='ChatRoom'
-      options={({ route }) => ({ title: route?.params?.name || 'Chat Room' })}
+      options={({ route }) => ({ title: route?.params?.receiver || 'Chat Room' })}
       component={ChatRoomScreen}
     />
   </Stack.Navigator>

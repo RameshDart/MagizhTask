@@ -1,72 +1,152 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, TextInput, Modal, KeyboardAvoidingView, Platform } from 'react-native';
-import { useSelector, useDispatch } from 'react-redux';
-import { listenForChats, addNewChat } from '../redux/chatSlice';
-import ChatScreenStyle from './ChatScreenStyle';
+import React, { useEffect, useState } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, TextInput, Button, Alert } from 'react-native';
+import { ref, onValue, set } from 'firebase/database';
+import { db } from '../firebase/config';
 
-function ChatListScreen({ navigation }) {
-  const dispatch = useDispatch();
-  const chats = useSelector((state) => state.chat.chats);
+function ChatListScreen({ navigation, route }) {
+  const { username } = route.params;
+  const [rooms, setRooms] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
-  const [newChatName, setNewChatName] = useState('');
+  const [newChatUser, setNewChatUser] = useState('');
 
   useEffect(() => {
-    dispatch(listenForChats());
+    const roomRef = ref(db, `chatRooms/${username}`);
+    const unsubscribe = onValue(roomRef, (snapshot) => {
+      const data = snapshot.val() || {};
+      setRooms(Object.keys(data));
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  const handleNewChat = () => {
-    if (!newChatName.trim()) return;
-    dispatch(addNewChat(newChatName.trim()));
-    setNewChatName('');
-    setModalVisible(false);
+  const startNewChat = () => {
+    if (newChatUser.trim() && newChatUser !== username) {
+      set(ref(db, `chatRooms/${username}/${newChatUser}`), true);
+      set(ref(db, `chatRooms/${newChatUser}/${username}`), true);
+      setModalVisible(false);
+      setNewChatUser('');
+      navigation.navigate('ChatRoom', {
+        sender: username,
+        receiver: newChatUser,
+      });
+    } else {
+      Alert.alert('Error', 'Enter a valid user to chat with.');
+    }
+  };
+
+  const handleLogout = () => {
+    Alert.alert('Logout', 'Are you sure you want to logout?', [
+      { text: 'Cancel' },
+      { text: 'Logout', onPress: () => navigation.replace('Login') },
+    ]);
   };
 
   return (
-    <KeyboardAvoidingView style={ChatScreenStyle.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <View style={styles.container}>
       <FlatList
-        data={chats}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={ChatScreenStyle.list}
+        data={rooms}
+        keyExtractor={(item) => item}
         renderItem={({ item }) => (
           <TouchableOpacity
-            style={ChatScreenStyle.chatItem}
-            onPress={() => navigation.navigate('ChatRoom', { chatId: item.id, name: item.name })}
+            style={styles.chatItem}
+            onPress={() =>
+              navigation.navigate('ChatRoom', {
+                sender: username,
+                receiver: item,
+              })
+            }
           >
-            <Text style={ChatScreenStyle.chatText}>{item.name}</Text>
+            <Text style={styles.name}>{item}</Text>
           </TouchableOpacity>
         )}
       />
 
-      <View style={ChatScreenStyle.bottomButtonWrapper}>
-        <TouchableOpacity style={ChatScreenStyle.bottomButton} onPress={() => setModalVisible(true)}>
-          <Text style={ChatScreenStyle.bottomButtonText}>+ New Chat</Text>
+      <View style={styles.bottomRow}>
+        <TouchableOpacity style={styles.actionButton} onPress={() => setModalVisible(true)}>
+          <Text style={styles.actionText}>+ New Chat</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={[styles.actionButton, { backgroundColor: 'red' }]} onPress={handleLogout}>
+          <Text style={styles.actionText}>Logout</Text>
         </TouchableOpacity>
       </View>
 
-      <Modal visible={modalVisible} animationType='slide' transparent>
-        <View style={ChatScreenStyle.modalWrapper}>
-          <View style={ChatScreenStyle.modalContent}>
-            <Text style={ChatScreenStyle.modalTitle}>Create New Chat</Text>
+      <Modal visible={modalVisible} transparent animationType='slide'>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
             <TextInput
-              value={newChatName}
-              onChangeText={setNewChatName}
-              placeholder='Name'
-              style={ChatScreenStyle.modalInput}
+              placeholder='Enter username'
+              value={newChatUser}
+              onChangeText={setNewChatUser}
+              style={styles.modalInput}
             />
-            <TouchableOpacity style={ChatScreenStyle.modalButton} onPress={handleNewChat}>
-              <Text style={ChatScreenStyle.modalButtonText}>Create</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[ChatScreenStyle.modalButton, { backgroundColor: 'red' }]}
-              onPress={() => setModalVisible(false)}
-            >
-              <Text style={ChatScreenStyle.modalButtonText}>Cancel</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'center' }}>
+              <Button title='Start Chat' onPress={startNewChat} />
+              <Button title='Cancel' onPress={() => setModalVisible(false)} color='red' />
+            </View>
           </View>
         </View>
       </Modal>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
 export default ChatListScreen;
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 20,
+    paddingBottom: 90,
+  },
+  chatItem: {
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ccc',
+  },
+  name: {
+    fontSize: 18,
+  },
+  bottomRow: {
+    position: 'absolute',
+    bottom: 30,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 10,
+  },
+  actionButton: {
+    flex: 1,
+    backgroundColor: '#007bff',
+    paddingVertical: 12,
+    borderRadius: 30,
+    alignItems: 'center',
+    elevation: 5,
+  },
+  actionText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    width: '80%',
+    padding: 20,
+    borderRadius: 10,
+    elevation: 10,
+  },
+  modalInput: {
+    borderWidth: 1,
+    marginBottom: 15,
+    padding: 10,
+    borderColor: '#ccc',
+  },
+});
